@@ -6,5 +6,6 @@ export default {
         './loaders/DDSLoader.js',
         './utils/BufferGeometryUtils.js',
         './capabilities/WebGL.js',
+        './webxr/VRButton.js',
     ],
 };
