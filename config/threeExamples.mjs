@@ -7,5 +7,7 @@ export default {
         './utils/BufferGeometryUtils.js',
         './capabilities/WebGL.js',
         './webxr/VRButton.js',
+        './libs/motion-controllers.module.js',
+        './webxr/XRControllerModelFactory.js',
     ],
 };
