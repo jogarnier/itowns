@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { VRButton } from 'ThreeExtended/webxr/VRButton';
 import { XRControllerModelFactory } from  'ThreeExtended/webxr/XRControllerModelFactory';
+import Coordinates from 'Core/Geographic/Coordinates';
 
 async function shutdownXR(session) {
     if (session) {
@@ -41,17 +42,33 @@ const initializeWebXR = (view, options) => {
             }
         };
 
-        const xrControllers = initControllers(webXRManager);
+        const vrHeadSet = new THREE.Object3D();
+        vrHeadSet.name = 'xrHeadset';
 
         view.scene.scale.multiplyScalar(scale);
         view.scene.updateMatrixWorld();
+
+
+        const xrControllers = initControllers(webXRManager, vrHeadSet);
+        
+
+        // avoid precision issues for controllers + allows continuous camera movements
+        const position = view.controls.getCameraCoordinate().as(view.referenceCrs);
+        view.camera.initialPosition = view.camera.position().clone();
+        const cameraOrientation = view.controls.getCameraOrientation();
+
+        const itownsDefaultView = { loc: new THREE.Vector3(), rot: new THREE.Quaternion(), scale: new THREE.Vector3() };
+        view.controls.camera.matrix.decompose(itownsDefaultView.loc, itownsDefaultView.rot, itownsDefaultView.scale);
+        // vrHeadSet.position.copy(new THREE.Vector3(position.x, position.y, position.z));
+        // vrHeadSet.applyQuaternion(itownsDefaultView.rot);
+
+        view.scene.add(vrHeadSet);
+
+
+
         view.mainLoop.gfxEngine.renderer.xr.enabled = true;
         view.mainLoop.gfxEngine.renderer.xr.getReferenceSpace('local');
-         view.camera.camera3D.position.multiplyScalar(scale);
-         view.camera.camera3D.updateMatrixWorld();
 
-        const position = view.camera.position();
-        view.camera.initialPosition = position.clone();
         const geodesicNormal = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), position.geodesicNormal).invert();
 
         const quat = new THREE.Quaternion(-1, 0, 0, 1).normalize().multiply(geodesicNormal);
@@ -65,10 +82,14 @@ const initializeWebXR = (view, options) => {
         // there it is not anymore : originOffset Matrix is :  4485948.5, 476198.03125, 4497216
 
         xr.setReferenceSpace(teleportSpaceOffset);
+        view.notifyChange();
 
         view.camera.camera3D = view.mainLoop.gfxEngine.renderer.xr.getCamera();
         view.camera.camera3D.far = 20000000000;
         view.camera.resize(view.camera.width, view.camera.height);
+
+        vrHeadSet.add(view.camera.camera3D);
+        // view.camera.setPosition(new Coordinates(view.referenceCrs, 0, 0, 0));
 
         document.addEventListener('keydown', exitXRSession, false);
 
@@ -136,25 +157,25 @@ const initializeWebXR = (view, options) => {
         }
     }
 
-    function initControllers(webXRManager) {
+    function initControllers(webXRManager, vrHeadSet) {
         const controllerModelFactory = new XRControllerModelFactory();
         const leftController = webXRManager.getController(0);
         leftController.name = 'leftController';
         const rightController = webXRManager.getController(1);
         rightController.name = 'rightController';
-        bindControllerListeners(leftController);
-        bindControllerListeners(rightController);
+        bindControllerListeners(leftController, vrHeadSet);
+        bindControllerListeners(rightController, vrHeadSet);
         const leftGripController = webXRManager.getControllerGrip(0);
         leftGripController.name = 'leftGripController';
         const rightGripController = webXRManager.getControllerGrip(1);
         rightGripController.name = 'rightGripController';
-        bindGripController(controllerModelFactory, leftGripController);
-        bindGripController(controllerModelFactory, rightGripController);
-        view.scene.add(new THREE.HemisphereLight(0xa5a5a5, 0x898989, 3));
+        bindGripController(controllerModelFactory, leftGripController, vrHeadSet);
+        bindGripController(controllerModelFactory, rightGripController, vrHeadSet);
+        vrHeadSet.add(new THREE.HemisphereLight(0xa5a5a5, 0x898989, 3));
         return { left: leftController, right: rightController };
     }
 
-    function bindControllerListeners(controller) {
+    function bindControllerListeners(controller, vrHeadSet) {
         controller.addEventListener('disconnected', function removeCtrl() {
             this.remove(this.children[0]);
         });
@@ -163,13 +184,12 @@ const initializeWebXR = (view, options) => {
             // {XRInputSource} event.data
             controller.gamepad = event.data.gamepad;
         });
-        // controller.matrix.makeScale(scale, scale, scale);
-        view.scene.add(controller);
+        vrHeadSet.add(controller);
     }
 
-    function bindGripController(controllerModelFactory, gripController) {
+    function bindGripController(controllerModelFactory, gripController, vrHeadSet) {
         gripController.add(controllerModelFactory.createControllerModel(gripController));
-        view.scene.add(gripController);
+        vrHeadSet.add(gripController);
     }
 
     function buildController(data) {
