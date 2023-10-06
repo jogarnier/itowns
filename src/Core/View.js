@@ -1046,6 +1046,7 @@ class View extends THREE.EventDispatcher {
             const length = orthoZ / Math.cos(angle);
             target.addVectors(camera.position, ray.direction.setLength(length));
         } else {
+            // FIXME picking doesn't work with arrayCamera
             const gl_FragCoord_Z = g.depthBufferRGBAValueToOrthoZ(buffer, camera);
 
             target.set(screen.x, screen.y, gl_FragCoord_Z);
