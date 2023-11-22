@@ -63,12 +63,16 @@
         const scale = 1;
 
         // Create a GlobeView
-        const view = new itowns.GlobeView(viewerDiv, placement, {
+        const view = new itowns.GlobeView(viewerDiv, placement, 
+        /** 
+          disable this part if you want to render outside webxr
+          {
             webXR: {
                 scale: scale,
                 callback: render
-            },
-        });
+            }, 
+        }
+        */);
 
         
         // Instantiate three's VR Button
@@ -325,6 +329,20 @@
         itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(addElevationLayerFromConfig);
         // must keep it, Failed to execute 'updateRenderState' on 'XRSession': Failed to read the 'depthFar' property from 'XRRenderStateInit': The provided double value is non-finite.
         itowns.Fetcher.json('./layers/JSONLayers/WORLD_DTM.json').then(addElevationLayerFromConfig);
+
+        view.render = function render() {
+            console.log("rendering");
+            var g = view.mainLoop.gfxEngine;
+            var pickedValueRightCamera = new itowns.THREE.Vector3();
+            view.getPickingPositionFromDepth(null, pickedValueRightCamera);  // from head camera PoV
+
+            if(pickedValueRightCamera) {
+                XRUtils.addPositionPoints('terrainPickAccuratePoint', pickedValueRightCamera, 0xb51800, 30, true);
+            }
+
+            g.renderView(view);
+
+        }
     </script>
 </body>
 
