@@ -53,7 +53,7 @@
         // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
         const viewerDiv = document.getElementById('viewerDiv');
         const contextXR = {
-            showDebug: false, // used by /js/XR/Utils.js
+            showDebug: true, // used by /js/XR/Utils.js
             tempMatrix: new itowns.THREE.Matrix4(),
             coordOnCamera: {},
             interactiveLayers: [],
@@ -146,8 +146,18 @@
             contextXR.tempMatrix.identity().extractRotation(contextXR.controller2.matrixWorld);
             contextXR.raycaster.ray.origin.setFromMatrixPosition(contextXR.controller2.matrixWorld);
             contextXR.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(contextXR.tempMatrix);
-
+            tryCameraIntersection();
             return contextXR.raycaster.intersectObjects(contextXR.interactiveLayers);
+        }
+
+        function tryCameraIntersection() {
+            // pick terrain coordinate from controller camera 
+            var pickedValueRightCamera = new itowns.THREE.Vector3();
+            view.getPickingPositionFromDepth(null, pickedValueRightCamera);  // from head camera PoV
+
+            if(pickedValueRightCamera) {
+                XRUtils.addPositionPoints('terrainPickAccuratePoint', pickedValueRightCamera, 0xb51800, 30, true);
+            }
         }
 
         function render() {

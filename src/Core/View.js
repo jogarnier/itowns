@@ -1030,6 +1030,7 @@ class View extends THREE.EventDispatcher {
         mouse.y = Math.floor(mouse.y);
 
         // Render/Read to buffer
+        /**  
         let buffer;
         if (viewPaused) {
             if (this.#fullSizeDepthBuffer.needsUpdate) {
@@ -1041,6 +1042,9 @@ class View extends THREE.EventDispatcher {
         } else {
             buffer = this.readDepthBuffer(mouse.x, mouse.y, 1, 1, this.#pixelDepthBuffer);
         }
+*/
+       // console.log(this.#pixelDepthBuffer);
+        const buffer =  this.readDepthBuffer(mouse.x, mouse.y, 1, 1, this.#pixelDepthBuffer);
 
         screen.x = (mouse.x / dim.x) * 2 - 1;
         screen.y = -(mouse.y / dim.y) * 2 + 1;
