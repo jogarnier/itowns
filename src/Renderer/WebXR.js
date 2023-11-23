@@ -92,8 +92,6 @@ const initializeWebXR = (view, options) => {
                     listenGamepad(xrControllers.right);
                 }
 
-                view.camera.camera3D.updateMatrix();
-                view.camera.camera3D.updateMatrixWorld(true);
                 resyncControlCamera();
 
                 if (view.scene.matrixWorldAutoUpdate === true) {
@@ -118,8 +116,6 @@ const initializeWebXR = (view, options) => {
         // search for other this.camera in Itowns code for perfs issues
         view.controls.camera.position.copy(view.camera.camera3D.position);
         view.controls.camera.rotation.copy(view.camera.camera3D.rotation);
-        view.controls.camera.updateMatrix();
-        // view.controls.camera.rotation.
     }
 
     function computeDistanceToGround() {
@@ -135,7 +131,6 @@ const initializeWebXR = (view, options) => {
 
     function updateFarDistance() {
         view.camera.camera3D.far =  Math.min(Math.max(view.camera.elevationToGround * 1000, 10000), 100000);
-        view.camera.camera3D.updateProjectionMatrix();
     }
 
     /*
