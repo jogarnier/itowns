@@ -391,7 +391,7 @@ function cameraOnFly(ctrl) {
 
 const Mode1 = {
     onSelectRightEnd: (ctrl) => {
-        applyTeleportation(ctrl);
+        // applyTeleportation(ctrl);
     },
     onSelectRightStart: (ctrl) => {
         ctrl.userData.isSelecting = true;
