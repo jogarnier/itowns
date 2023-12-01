@@ -14,18 +14,12 @@ function _extendBuffer(feature, size) {
         feature.normals.length = feature.vertices.length;
     }
 }
-
-function _setGeometryValues(geom, feature, long, lat, alt, normal) {
+function _setGeometryValues(feature, coord) {
     if (feature.normals) {
-        normal.toArray(feature.normals, feature._pos);
+        coord.geodesicNormal.toArray(feature.normals, feature._pos);
     }
 
-    feature._pushValues(long, lat, alt);
-
-    if (geom.size == 3) {
-        geom.altitude.min = Math.min(geom.altitude.min, alt);
-        geom.altitude.max = Math.max(geom.altitude.max, alt);
-    }
+    feature._pushValues(coord.x, coord.y, coord.z);
 }
 
 const coordOut = new Coordinates('EPSG:4326', 0, 0, 0);
@@ -35,8 +29,6 @@ export const FEATURE_TYPES = {
     LINE: 1,
     POLYGON: 2,
 };
-
-const typeToStyleProperty = ['point', 'stroke', 'fill'];
 
 /**
  * @property {string} crs - The CRS to convert the input coordinates to.
@@ -81,10 +73,6 @@ export class FeatureGeometry {
             this.extent = defaultExtent(feature.extent.crs);
             this.#currentExtent = defaultExtent(feature.extent.crs);
         }
-        this.altitude = {
-            min: Infinity,
-            max: -Infinity,
-        };
     }
     /**
      * Add a new marker to indicate the starting of sub geometry and extends the vertices buffer.
@@ -128,24 +116,22 @@ export class FeatureGeometry {
         return this.indices[last];
     }
 
-    baseAltitude(feature, coordinates) {
-        const base_altitude = feature.style[typeToStyleProperty[feature.type]].base_altitude || 0;
-        return isNaN(base_altitude) ? base_altitude(this.properties, coordinates) : base_altitude;
-    }
-
     /**
      * Push new coordinates in vertices buffer.
-     * @param {Coordinates} coordIn The coordinates to push.
      * @param {Feature} feature - the feature containing the geometry
+     * @param {Coordinates} coordIn The coordinates to push.
      */
-    pushCoordinates(coordIn, feature) {
-        coordIn.z = this.baseAltitude(feature, coordIn);
+    pushCoordinates(feature, coordIn) {
+        if (feature.isCoordinates) {
+            console.warn('Deprecated: change in arguments order, use pushCoordinates(feature, coordIn) instead');
+            this.pushCoordinates(coordIn, feature);
+            return;
+        }
 
         coordIn.as(feature.crs, coordOut);
-
         feature.transformToLocalSystem(coordOut);
 
-        _setGeometryValues(this, feature, coordOut.x, coordOut.y, coordOut.z, coordOut.geodesicNormal);
+        _setGeometryValues(feature, coordOut);
 
         // expand extent if present
         if (this.#currentExtent) {
@@ -154,23 +140,29 @@ export class FeatureGeometry {
     }
 
     /**
-     * Push new values coordinates in vertices buffer.
+     * Push new values coordinates in vertices buffer without any transformation.
      * No geographical conversion is made or the normal doesn't stored.
-     * No local transformation is made on coordinates.
      *
      * @param {Feature} feature - the feature containing the geometry
-     * @param {number} long The longitude coordinate.
-     * @param {number} lat The latitude coordinate.
-     * @param {THREE.Vector3} [normal] the normal on coordinates (only for `EPSG:4978` projection).
-     */
-    pushCoordinatesValues(feature, long, lat, normal) {
-        const altitude = this.baseAltitude(feature);
+     * @param {Object} coordIn An object containing the coordinates values to push.
+     * @param {number} coordIn.x the x coordinate (in a local system).
+     * @param {number} coordIn.y the y coordinate (in a local system).
+     * @param {THREE.Vector3} [coordIn.normal] the normal on coordinates (only for `EPSG:4978` projection).
+     * @param {Coordinates} [coordProj] An optional argument containing the geodesic coordinates in EPSG:4326
+     * It allows the user to get access to the feature coordinates to set style.base_altitude.
+    */
+    pushCoordinatesValues(feature, coordIn, coordProj, ...args) {
+        if (args.length > 0) {
+            console.warn('Deprecated: change in arguments, use pushCoordinatesValues(feature, {x: long, y: lat, normal}, coordProj) instead');
+            this.pushCoordinatesValues(feature, { x: coordIn, y: coordProj, normal: args[0] }, args[1]);
+            return;
+        }
 
-        _setGeometryValues(this, feature, long, lat, altitude, normal);
+        _setGeometryValues(feature, coordIn);
 
         // expand extent if present
         if (this.#currentExtent) {
-            this.#currentExtent.expandByValuesCoordinates(long, lat);
+            this.#currentExtent.expandByValuesCoordinates(coordIn.x, coordIn.y);
         }
     }
 
@@ -260,11 +252,6 @@ class Feature {
         this._pos = 0;
         this._pushValues = (this.size === 3 ? push3DValues : push2DValues).bind(this);
         this.style = new Style({}, collection.style);
-
-        this.altitude = {
-            min: Infinity,
-            max: -Infinity,
-        };
     }
     /**
      * Instance a new {@link FeatureGeometry}  and push in {@link Feature}.
@@ -282,11 +269,6 @@ class Feature {
     updateExtent(geometry) {
         if (this.extent) {
             this.extent.union(geometry.extent);
-        }
-
-        if (this.size == 3) {
-            this.altitude.min = Math.min(this.altitude.min, geometry.altitude.min);
-            this.altitude.max = Math.max(this.altitude.max, geometry.altitude.max);
         }
     }
 
@@ -410,11 +392,6 @@ export class FeatureCollection extends THREE.Object3D {
             };
             this.#transformToLocalSystem = transformToLocalSystem3D;
         }
-
-        this.altitude = {
-            min: Infinity,
-            max: -Infinity,
-        };
     }
 
     /**
@@ -442,14 +419,6 @@ export class FeatureCollection extends THREE.Object3D {
                 this.extent.union(ext);
             }
         }
-        if (this.size == 3) {
-            for (const feature of this.features) {
-                this.altitude.min = Math.min(this.altitude.min, feature.altitude.min);
-                this.altitude.max = Math.max(this.altitude.max, feature.altitude.max);
-            }
-        }
-        this.altitude.min = this.altitude.min == Infinity ? 0 : this.altitude.min;
-        this.altitude.max = this.altitude.max == -Infinity ? 0 : this.altitude.max;
     }
 
     /**
@@ -525,8 +494,6 @@ export class FeatureCollection extends THREE.Object3D {
         ref.normals = feature.normals;
         ref.size = feature.size;
         ref.vertices = feature.vertices;
-        ref.altitude.min = feature.altitude.min;
-        ref.altitude.max = feature.altitude.max;
         ref._pos = feature._pos;
         this.features.push(ref);
         return ref;

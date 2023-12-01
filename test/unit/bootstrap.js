@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 import fetch from 'node-fetch';
 import { Camera } from 'three';
 
@@ -77,6 +78,29 @@ class DOMElement {
 // Mock HTMLDivElement for Mocha
 global.HTMLDivElement = DOMElement;
 
+class HTMLImageElement extends DOMElement {
+    constructor(width, height) {
+        super();
+        this.width = width || 10;
+        this.height = height || 10;
+        this.naturalWidth = this.width;
+        this.naturalHeight = this.height;
+        Object.defineProperty(this, 'src', {
+            set: () => { this.emitEvent('load'); },
+        });
+    }
+}
+
+class CanvasPattern {
+    // eslint-disable-next-line no-unused-vars
+    setTransform(matrix) { return undefined; }
+}
+
+class DOMMatrix {
+    // eslint-disable-next-line no-unused-vars
+    scale(matrix) { return [1, 1, 1, 1]; }
+}
+
 // Mock document object for Mocha.
 global.document = {
     createElement: (type) => {
@@ -118,6 +142,11 @@ global.document = {
                     image.height = imageData.sh;
                     return image;
                 },
+                // eslint-disable-next-line no-unused-vars
+                createPattern: (image, repetition) => {
+                    const canvasPattern = new CanvasPattern();
+                    return canvasPattern;
+                },
                 canvas,
             });
 
@@ -125,13 +154,12 @@ global.document = {
 
             return canvas;
         } else if (type == 'img') {
-            const img = new DOMElement();
-            img.width = 10;
-            img.height = 10;
-            Object.defineProperty(img, 'src', {
-                set: () => { img.emitEvent('load'); },
-            });
+            const img = new HTMLImageElement();
             return img;
+        } else if (type == 'svg') {
+            const svg = new DOMElement();
+            svg.createSVGMatrix = () => new DOMMatrix();
+            return svg;
         }
 
         return new DOMElement();
@@ -154,18 +182,38 @@ global.document.body = new DOMElement();
 
 global.XRRigidTransform = () => {};
 
+class Path2D {
+    moveTo() {}
+    lineTo() {}
+}
+
+global.Path2D = Path2D;
+
+class EventDispatcher {
+    constructor() {
+        this.events = new Map();
+    }
+
+    addEventListener(type, listener) {
+        this.events.set(type, listener);
+    }
+
+    dispatchEvent(event) {
+        this.events.get(event.type).call(this, event);
+    }
+}
+
 class Renderer {
     constructor() {
         this.domElement = new DOMElement();
         this.domElement.parentElement = new DOMElement();
         this.domElement.parentElement.appendChild(this.domElement);
 
-        this.xr = new DOMElement();
+        this.xr = new EventDispatcher();
         this.xr.isPresenting = false;
         this.xr.getReferenceSpace = () => ({
             getOffsetReferenceSpace: () => {},
         });
-        this.xr.XRRigidTransform = () => {};
         this.xr.setReferenceSpace = () => {};
         this.xr.getCamera = () => new Camera();
         this.xr.setAnimationLoop = () => {};

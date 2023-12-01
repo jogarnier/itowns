@@ -1,5 +1,5 @@
 const conf = {
-    version: '2.40.0',
+    version: '2.41.0',
 };
 export const REVISION = conf.version;
 
@@ -19,7 +19,7 @@ export { VIEW_EVENTS } from 'Core/View';
 export { default as FeatureProcessing } from 'Process/FeatureProcessing';
 export { updateLayeredMaterialNodeImagery, updateLayeredMaterialNodeElevation } from 'Process/LayeredMaterialNodeProcessing';
 export { default as OrientedImageCamera } from 'Renderer/OrientedImageCamera';
-export { default as PointsMaterial, PNTS_MODE, ClassificationScheme } from 'Renderer/PointsMaterial';
+export { default as PointsMaterial, PNTS_MODE, PNTS_SHAPE, PNTS_SIZE_MODE, ClassificationScheme } from 'Renderer/PointsMaterial';
 export { default as GlobeControls } from 'Controls/GlobeControls';
 export { default as FlyControls } from 'Controls/FlyControls';
 export { default as FirstPersonControls } from 'Controls/FirstPersonControls';
@@ -91,7 +91,7 @@ export { default as LASParser } from 'Parser/LASParser';
 export { default as ISGParser } from 'Parser/ISGParser';
 export { default as GDFParser } from 'Parser/GDFParser';
 export { default as GTXParser } from 'Parser/GTXParser';
-export { enableDracoLoader, glTFLoader, legacyGLTFLoader } from 'Parser/B3dmParser';
+export { enableDracoLoader, enableKtx2Loader, glTFLoader, legacyGLTFLoader } from 'Parser/B3dmParser';
 
 // 3D Tiles classes and extensions
 // Exported to allow one to implement its own 3D Tiles extension which needs to

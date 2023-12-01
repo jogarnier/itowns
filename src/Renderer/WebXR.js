@@ -1,7 +1,6 @@
 /* global XRRigidTransform */
 
 import * as THREE from 'three';
-import { VRButton } from 'ThreeExtended/webxr/VRButton';
 import { XRControllerModelFactory } from  'ThreeExtended/webxr/XRControllerModelFactory';
 import Coordinates from 'Core/Geographic/Coordinates';
 import DEMUtils from 'Utils/DEMUtils';
@@ -18,27 +17,23 @@ async function shutdownXR(session) {
  * @param {*} options webXR, callback
  */
 const initializeWebXR = (view, options) => {
-    document.body.appendChild(VRButton.createButton(view.mainLoop.gfxEngine.renderer));
-    const xr = view.mainLoop.gfxEngine.renderer.xr;
     const scale = options.scale || 1.0;
 
+    const xr = view.mainLoop.gfxEngine.renderer.xr;
+
     xr.addEventListener('sessionstart', () => {
-        console.log('Web XR session start'); // eslint-disable-line
-
         const camera = view.camera.camera3D;
-        const webXRManager = view.mainLoop.gfxEngine.renderer.xr;
 
-        const exitXRSession =  (event) => {
+        const exitXRSession = (event) => {
             if (event.key === 'Escape') {
-                console.log('Web XR session stop'); // eslint-disable-line
                 document.removeEventListener('keydown', exitXRSession);
-                view.mainLoop.gfxEngine.renderer.xr.enabled = false;
+                xr.enabled = false;
                 view.camera.camera3D = camera;
 
                 view.scene.scale.multiplyScalar(1 / scale);
                 view.scene.updateMatrixWorld();
 
-                shutdownXR(webXRManager.getSession());
+                shutdownXR(xr.getSession());
                 view.notifyChange(view.camera.camera3D, true);
             }
         };
@@ -49,19 +44,16 @@ const initializeWebXR = (view, options) => {
         view.scene.scale.multiplyScalar(scale);
         view.scene.updateMatrixWorld();
         
-        const xrControllers = initControllers(webXRManager, vrHeadSet);
-        // avoid precision issues for controllers + allows continuous camera movements
+        const xrControllers = initControllers(xr, vrHeadSet);
+        
         const position = view.controls.getCameraCoordinate().as(view.referenceCrs);
-
-        const itownsDefaultView = { loc: new THREE.Vector3(), rot: new THREE.Quaternion(), scale: new THREE.Vector3() };
-        view.controls.camera.matrix.decompose(itownsDefaultView.loc, itownsDefaultView.rot, itownsDefaultView.scale);
-        // vrHeadSet.position.copy(new THREE.Vector3(position.x, position.y, position.z));
-        // vrHeadSet.applyQuaternion(itownsDefaultView.rot);
-
+        // To avoid controllers precision issues, headset should handle camera position and camera should be reset to origin
         view.scene.add(vrHeadSet);
 
-        view.mainLoop.gfxEngine.renderer.xr.enabled = true;
-        view.mainLoop.gfxEngine.renderer.xr.getReferenceSpace('local');
+
+
+        xr.enabled = true;
+        xr.getReferenceSpace('local');
 
         const geodesicNormal = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), position.geodesicNormal).invert();
 
@@ -73,7 +65,7 @@ const initializeWebXR = (view, options) => {
         const baseReferenceSpace = xr.getReferenceSpace();
         const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace(transform);
         // there it is not anymore : originOffset Matrix is :  4485948.5, 476198.03125, 4497216
-
+          
         // Must delay replacement to allow user listening to sessionstart to get original ReferenceSpace
         setTimeout(() => {
              xr.setReferenceSpace(teleportSpaceOffset);
@@ -81,17 +73,16 @@ const initializeWebXR = (view, options) => {
          });
         view.notifyChange();
 
-        view.camera.camera3D = view.mainLoop.gfxEngine.renderer.xr.getCamera();
-        updateFarDistance();
+        view.camera.camera3D = xr.getCamera();
+        view.camera.camera3D.far = 100;
         view.camera.resize(view.camera.width, view.camera.height);
-
         vrHeadSet.add(view.camera.camera3D);
-        // view.camera.setPosition(new Coordinates(view.referenceCrs, 0, 0, 0));
 
         document.addEventListener('keydown', exitXRSession, false);
 
-
-        webXRManager.setAnimationLoop((timestamp) => {
+        // TODO Fix asynchronization between xr and MainLoop render loops.
+        // (see MainLoop#scheduleViewUpdate).
+        xr.setAnimationLoop((timestamp) => {
             if (xr.isPresenting && view.camera.camera3D.cameras[0]) {
 
                 if (xrControllers.left) {
@@ -101,8 +92,6 @@ const initializeWebXR = (view, options) => {
                     listenGamepad(xrControllers.right);
                 }
 
-                view.camera.camera3D.updateMatrix();
-                view.camera.camera3D.updateMatrixWorld(true);
                 resyncControlCamera();
 
                 if (view.scene.matrixWorldAutoUpdate === true) {
@@ -126,28 +115,23 @@ const initializeWebXR = (view, options) => {
     function resyncControlCamera() {
         // search for other this.camera in Itowns code for perfs issues
         view.controls.camera.position.copy(view.camera.camera3D.position);
-        view.controls.camera.updateMatrix();
-        // view.controls.camera.rotation.
+        view.controls.camera.rotation.copy(view.camera.camera3D.rotation);
     }
 
     function computeDistanceToGround() {
-        // view.controls.getCameraCoordinate().altitude updates are not triggered
-        const vectorPostion = new THREE.Vector3().setFromMatrixPosition(view.camera.camera3D.matrixWorld);
-        const coordsCamera = new Coordinates(view.referenceCrs, vectorPostion.x, vectorPostion.y, vectorPostion.z);
-        const elevation = DEMUtils.getElevationValueAt(view.tileLayer, coordsCamera, DEMUtils.PRECISE_READ_Z);
-        const coords = coordsCamera.as(view.controls.getCameraCoordinate().crs);
-        view.camera.elevationToGround = coords.altitude - elevation;
-        view.camera.testPosition = vectorPostion;
-        view.camera.projectedCoordinates = coords;
+        view.camera.elevationToGround = view.controls.getCameraCoordinate().altitude;
     }
 
     function updateFarDistance() {
         view.camera.camera3D.far =  Math.min(Math.max(view.camera.elevationToGround * 1000, 10000), 100000);
-        view.camera.camera3D.updateProjectionMatrix();
     }
 
     /*
     Listening {XRInputSource} and emit changes for convenience user binding
+    Adding a few internal states for reactivity 
+    - controller.lockButtonIndex    {number} when a button is pressed, gives its index
+    - controller.isStickActive      {boolean} true when a controller stick is not on initial state.
+    - 
     */
     function listenGamepad(controller) {
         if (controller.gamepad) {
@@ -174,11 +158,11 @@ const initializeWebXR = (view, options) => {
                     // 0 - gachette index
                     // 1 - gachette majeur
                     // 3 - stick pressed
-                    // 4 - botton button
+                    // 4 - bottom button
                     // 5 - upper button
                     controller.dispatchEvent({ type: 'itowns-xr-button-pressed', message: { controller, buttonIndex: index, button } });
                     controller.lastButtonItem = button;
-                } else if (controller.lastButtonItem === button && controller.lastButtonItem) {
+                } else if (controller.lastButtonItem && controller.lastButtonItem === button) {
                     controller.dispatchEvent({ type: 'itowns-xr-button-released', message: { controller, buttonIndex: index, button } });
                     controller.lastButtonItem = undefined;
                 }
@@ -213,7 +197,7 @@ const initializeWebXR = (view, options) => {
             this.remove(this.children[0]);
         });
         controller.addEventListener('connected', (event) => {
-          //  this.add(buildController(event.data)); // FIXME doesn't seem to work in Geo Context
+           // this.add(buildController(event.data)); // FIXME doesn't seem to work in Geo Context
             // {XRInputSource} event.data
             controller.gamepad = event.data.gamepad;
             // controller.inputSource = event.data;

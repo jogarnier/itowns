@@ -6,8 +6,10 @@ import Coordinates from 'Core/Geographic/Coordinates';
 import Extent from 'Core/Geographic/Extent';
 import Label from 'Core/Label';
 import { FEATURE_TYPES } from 'Core/Feature';
-import { readExpression } from 'Core/Style';
+import { readExpression, StyleContext } from 'Core/Style';
 import { ScreenGrid } from 'Renderer/Label2DRenderer';
+
+const context = new StyleContext();
 
 const coord = new Coordinates('EPSG:4326', 0, 0, 0);
 
@@ -138,7 +140,8 @@ class LabelsNode extends THREE.Group {
 /**
  * A layer to handle a bunch of `Label`. This layer can be created on its own,
  * but it is better to use the option `addLabelLayer` on another `Layer` to let
- * it work with it (see the `vector_tile_raster_2d` example).
+ * it work with it (see the `vector_tile_raster_2d` example). Supported for Points features, not yet
+ * for Lines and Polygons features.
  *
  * @property {boolean} isLabelLayer - Used to checkout whether this layer is a
  * LabelLayer.  Default is true. You should not change this, as it is used
@@ -240,7 +243,11 @@ class LabelLayer extends GeometryLayer {
         // Converting the extent now is faster for further operation
         extent.as(data.crs, _extent);
         coord.crs = data.crs;
-        const globals = { zoom: extent.zoom };
+        context.globals = {
+            icon: true,
+            text: true,
+            zoom: extent.zoom,
+        };
 
         data.features.forEach((f) => {
             // TODO: add support for LINE and POLYGON
@@ -267,15 +274,16 @@ class LabelLayer extends GeometryLayer {
                 if (!_extent.isPointInside(coord)) { return; }
 
                 const geometryField = g.properties.style && g.properties.style.text.field;
+
+                context.setGeometry(g);
                 let content;
-                const context = { globals, properties: () => g.properties };
                 if (this.labelDomelement) {
                     content = readExpression(this.labelDomelement, context);
                 } else if (!geometryField && !featureField && !layerField) {
                     // Check if there is an icon, with no text
-                    if (!(g.properties.style && (g.properties.style.icon.source || g.properties.style.icon.key))
-                        && !(f.style && (f.style.icon.source || f.style.icon.key))
-                        && !(this.style && (this.style.icon.source || this.style.icon.key))) {
+                    if (!(g.properties.style && (g.properties.style.icon.source || g.properties.style.icon.id))
+                        && !(f.style && (f.style.icon.source || f.style.icon.id))
+                        && !(this.style && (this.style.icon.source || this.style.icon.id))) {
                         return;
                     }
                 } else if (geometryField) {
@@ -286,9 +294,9 @@ class LabelLayer extends GeometryLayer {
                     content = this.style.getTextFromProperties(context);
                 }
 
-                const style = (g.properties.style || f.style || this.style).symbolStylefromContext(context);
+                const style = (g.properties.style || f.style || this.style).applyContext(context);
 
-                const label = new Label(content, coord.clone(), style, this.source.sprites);
+                const label = new Label(content, coord.clone(), style);
                 label.layerId = this.id;
                 label.padding = this.margin || label.padding;
 

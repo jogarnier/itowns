@@ -3,11 +3,14 @@ export default {
     filesExamples: [
         './loaders/GLTFLoader.js',
         './loaders/DRACOLoader.js',
+        './loaders/KTX2Loader.js',
         './loaders/DDSLoader.js',
         './utils/BufferGeometryUtils.js',
+        './utils/WorkerPool.js',
         './capabilities/WebGL.js',
-        './webxr/VRButton.js',
-        './libs/motion-controllers.module.js',
+        './libs/ktx-parse.module.js',
+        './libs/zstddec.module.js',
         './webxr/XRControllerModelFactory.js',
+        './libs/motion-controllers.module.js',
     ],
 };

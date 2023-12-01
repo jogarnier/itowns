@@ -1,7 +1,7 @@
 import assert from 'assert';
 import * as THREE from 'three';
 import Label from 'Core/Label';
-import Style, { cacheStyle } from 'Core/Style';
+import Style from 'Core/Style';
 import { FeatureCollection, FEATURE_TYPES } from 'Core/Feature';
 import Coordinates from 'Core/Geographic/Coordinates';
 import Extent from 'Core/Geographic/Extent';
@@ -33,7 +33,7 @@ describe('LabelLayer', function () {
         const feature = collection.requestFeatureByType(FEATURE_TYPES.POINT);
         const geometry = feature.bindNewGeometry();
         geometry.startSubGeometry(0, feature);
-        geometry.pushCoordinatesValues(feature, 0, 0);
+        geometry.pushCoordinatesValues(feature, { x: 0, y: 0 });
         geometry.closeSubGeometry(3, feature);
         geometry.properties = { content: 'foo' };
 
@@ -75,53 +75,6 @@ describe('Label', function () {
     it('should correctly create Labels', function () {
         assert.doesNotThrow(() => { label = new Label('', c); });
         assert.doesNotThrow(() => { label = new Label(document.createElement('div'), c); });
-    });
-
-    it('should set the correct icon anchor position', function () {
-        label = new Label('', c, style, sprites);
-
-        // Mock async loading image
-        const img = cacheStyle.get('icon', 1);
-        img.complete = true;
-        img.emitEvent('load');
-        assert.equal(label.content.children[0].style.left, `${-0.5 * img.width}px`);
-        assert.equal(label.content.children[0].style.top, `${-0.5 * img.height}px`);
-
-
-        style.icon.anchor = 'left';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, '0');
-        assert.equal(label.content.children[0].style.top, `${-0.5 * img.height}px`);
-
-        style.icon.anchor = 'right';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, `${-img.width}px`);
-        assert.equal(label.content.children[0].style.top, `${-0.5 * img.height}px`);
-
-        style.icon.anchor = 'top';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, `${-0.5 * img.width}px`);
-        assert.equal(label.content.children[0].style.top, '0');
-
-        style.icon.anchor = 'bottom';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, `${-0.5 * img.width}px`);
-        assert.equal(label.content.children[0].style.top, `${-img.height}px`);
-
-        style.icon.anchor = 'bottom-left';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, '0');
-        assert.equal(label.content.children[0].style.top, `${-img.height}px`);
-
-        style.icon.anchor = 'bottom-right';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, `${-img.width}px`);
-        assert.equal(label.content.children[0].style.top, `${-img.height}px`);
-
-        style.icon.anchor = 'top-left';
-        label = new Label('', c, style);
-        assert.equal(label.content.children[0].style.left, '0');
-        assert.equal(label.content.children[0].style.top, '0');
     });
 
     it('should hide the DOM', function () {
@@ -270,8 +223,8 @@ describe('Label2DRenderer', function () {
             labelLayer.update(context, labelLayer, tiles[0], tiles[0].parent);
             assert.equal(1, labelLayer.object3d.children.length);
             view.controls.lookAtCoordinate({ coord: labelLayer.object3d.children[0].children[0].coordinates, range: 1000 }, false).then(() => {
-                view.camera.camera3D.updateMatrixWorld(true);
-                label2dRenderer.render(view.scene, view.camera.camera3D);
+                view.camera3D.updateMatrixWorld(true);
+                label2dRenderer.render(view.scene, view.camera3D);
                 assert.equal(1, label2dRenderer.grid.visible.length);
                 const label = label2dRenderer.grid.visible[0];
                 assert.ok(label.visible);

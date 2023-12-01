@@ -9,10 +9,13 @@ import Capabilities from 'Core/System/Capabilities';
 import { unpack1K } from 'Renderer/LayeredMaterial';
 import WEBGL from 'ThreeExtended/capabilities/WebGL';
 import Label2DRenderer from 'Renderer/Label2DRenderer';
+import { deprecatedC3DEngineWebGLOptions } from 'Core/Deprecated/Undeprecator';
 
 const depthRGBA = new THREE.Vector4();
 class c3DEngine {
     constructor(rendererOrDiv, options = {}) {
+        deprecatedC3DEngineWebGLOptions(options);
+
         const NOIE = !Capabilities.isInternetExplorer();
         // pick sensible default options
         if (options.antialias === undefined) {
@@ -58,9 +61,9 @@ class c3DEngine {
 
         this.renderView = function _(view) {
             this.renderer.clear();
-            this.renderer.render(view.scene, view.camera.camera3D);
+            this.renderer.render(view.scene, view.camera3D);
             if (view.tileLayer) {
-                this.label2dRenderer.render(view.tileLayer.object3d, view.camera.camera3D);
+                this.label2dRenderer.render(view.tileLayer.object3d, view.camera3D);
             }
         }.bind(this);
 
